@@ -1,0 +1,3 @@
+[submodule "src/wasp-map-layers"]
+	path = src/wasp-map-layers
+	url = https://github.com/WaspScripts/wasp-map-layers
