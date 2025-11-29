@@ -2,25 +2,38 @@
 	import { onMount } from "svelte"
 
 	let canvas: HTMLCanvasElement
+	let context: CanvasRenderingContext2D
+
 	let isDragging = $state(false)
-	let startMouseX = $state(0)
-	let startMouseY = $state(0)
-	let offsetX = $state(0)
-	let offsetY = $state(0)
+
+	let mouseX = $state(0)
+	let mouseY = $state(0)
+	let positionX = $state(0)
+	let positionY = $state(0)
 
 	const size = 256
+
 	let x = $state(47)
 	let y = $state(55)
 
 	let width = $state(0)
 	let height = $state(0)
 
-	const buffer = 0
+	const centerX = $derived(Math.round(width / 2))
+	const centerY = $derived(Math.round(height / 2))
 
-	let x1 = $derived(Math.round(x - (offsetX + size) / size) - buffer)
-	let x2 = $derived(Math.round(x + (width - offsetX) / size) + buffer)
-	let y1 = $derived(Math.round(y - (height - offsetY) / size) - buffer)
-	let y2 = $derived(Math.round(y + (offsetY + size) / size) + buffer)
+	/*
+	const bufferX = $derived(Math.ceil((width / size) * 1.1))
+	const bufferY = $derived(Math.ceil((height / size) * 1.1))
+	*/
+
+	const bufferX = 1
+	const bufferY = 1
+
+	const x1 = $derived(x - bufferX)
+	const y1 = $derived(y - bufferY)
+	const x2 = $derived(x + bufferX)
+	const y2 = $derived(y + bufferY)
 
 	function loadImage(src: string) {
 		return new Promise<HTMLImageElement>((resolve, reject) => {
@@ -33,24 +46,24 @@
 
 	const tileCache = new Map<string, HTMLImageElement>()
 
-	async function loadVisibleTiles(offsetX: number, offsetY: number, cols: number, rows: number) {
-		const tiles: { x: number; y: number; img: HTMLImageElement }[] = []
+	async function loadVisibleTiles() {
+		const tiles: { x: number; y: number; img: HTMLImageElement | null }[] = []
 
-		for (let xx = x1; xx <= x2; xx++) {
-			for (let yy = y2; yy >= y1; yy--) {
-				const key = `${xx}-${yy}`
+		for (let x = x1; x <= x2; x++) {
+			for (let y = y2; y >= y1; y--) {
+				const key = `${x}-${y}`
 				if (tileCache.has(key)) {
-					tiles.push({ x: xx, y: yy, img: tileCache.get(key)! })
-				} else {
-					loadImage(`/wasp-map-layers/map/0/${xx}-${yy}.png`)
-						.then((img) => {
-							tileCache.set(key, img)
+					tiles.push({ x: x, y: y, img: tileCache.get(key)! })
+					continue
+				}
 
-							drawTiles()
-						})
-						.catch((e) => {
-							console.error(`Tile ${xx}-${yy} failed: ${e}`)
-						})
+				try {
+					const img = await loadImage(`/wasp-map-layers/map/0/${x}-${y}.png`)
+					tileCache.set(key, img)
+					tiles.push({ x: x, y: y, img })
+				} catch (e) {
+					console.error(e)
+					tiles.push({ x: x, y: y, img: null })
 				}
 			}
 		}
@@ -59,33 +72,32 @@
 	}
 
 	async function drawTiles() {
-		const ctx = canvas.getContext("2d")
-		if (!ctx) return
+		const tiles = loadVisibleTiles()
+		context.clearRect(0, 0, canvas.width, canvas.height)
 
-		canvas.width = window.innerWidth
-		canvas.height = window.innerHeight
-
-		const cols = Math.ceil(canvas.width / size) + buffer
-		const rows = Math.ceil(canvas.height / size) + buffer
-
-		const startTileX = 0
-		const startTileY = 0
-
-		const tiles = await loadVisibleTiles(startTileX, startTileY, cols, rows)
-
-		// clear and draw whatever we have cached right now
-		ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-		for (const tile of tiles) {
-			const drawX = (tile.x - x) * size + offsetX
-			const drawY = (y - tile.y) * size + offsetY
-			ctx.drawImage(tile.img, drawX, drawY, size, size)
+		for (const tile of await tiles) {
+			if (!tile.img) continue
+			const drawX = centerX + (tile.x - x) * size + positionX - size / 2
+			const drawY = centerY + (y - tile.y) * size + positionY - size / 2
+			context.drawImage(tile.img, drawX, drawY, size, size)
 		}
 	}
 
-	onMount(async () => {
+	function onResize() {
+		canvas.width = window.innerWidth
+		canvas.height = window.innerHeight
 		width = canvas.width
 		height = canvas.height
+	}
+
+	onMount(async () => {
+		const ctx = canvas.getContext("2d")
+		if (!ctx) return
+
+		context = ctx
+
+		onResize()
+		window.addEventListener("resize", onResize)
 		await drawTiles()
 	})
 
@@ -94,23 +106,32 @@
 
 <canvas
 	bind:this={canvas}
-	class="h-full w-full"
 	onmousedown={(event) => {
 		isDragging = true
-		startMouseX = event.clientX
-		startMouseY = event.clientY
+		mouseX = event.clientX
+		mouseY = event.clientY
 	}}
 	onmousemove={(event) => {
 		if (!isDragging) return
 
-		const deltaX = event.clientX - startMouseX
-		const deltaY = event.clientY - startMouseY
+		const deltaX = event.clientX - mouseX
+		const deltaY = event.clientY - mouseY
 
-		offsetX += deltaX
-		offsetY += deltaY
+		positionX += deltaX
+		positionY += deltaY
 
-		startMouseX = event.clientX
-		startMouseY = event.clientY
+		if (Math.abs(positionX) >= size) {
+			x -= Math.floor(positionX / size)
+			positionX = 0
+		}
+
+		if (Math.abs(positionY) >= size) {
+			y += Math.floor(positionY / size)
+			positionY = 0
+		}
+
+		mouseX = event.clientX
+		mouseY = event.clientY
 
 		drawTiles()
 	}}
