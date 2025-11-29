@@ -1,7 +1,7 @@
 import { error } from "@sveltejs/kit"
 import { mkdir, readFile, writeFile } from "fs/promises"
 import { join } from "path"
-import { Transformer } from "@napi-rs/image"
+import { ResizeFilterType, Transformer } from "@napi-rs/image"
 
 export const GET = async ({ params: { map, zoom, plane, x, y } }) => {
 	switch (map) {
@@ -44,15 +44,28 @@ export const GET = async ({ params: { map, zoom, plane, x, y } }) => {
 		})
 	} catch (e) {
 		try {
-			const pngPath = join(".", "static", "wasp-map-layers", map, plane, file + ".png")
-			const png = await readFile(pngPath)
-			const promises = await Promise.all([
-				mkdir(path, { recursive: true }),
-				new Transformer(png).webpLossless()
-			])
+			const saticPath = join(".", "static", "wasp-map-layers", map, plane)
+			const pngPath = join(saticPath, file + ".png")
+			const promises = await Promise.all([readFile(pngPath), mkdir(path, { recursive: true })])
+			const png = promises[0]
+			const transformer = new Transformer(png)
+			let webp: Buffer<ArrayBufferLike>
 
-			const webp = promises[1]
-			await writeFile(join(path, file + ".webp"), webp)
+			console.log(zoomN)
+			if (zoomN == 0) {
+				webp = await transformer.webpLossless()
+				await writeFile(join(path, file + ".webp"), webp)
+			} else if (zoomN > 0) {
+				const size = (zoomN + 1) * 256
+
+				webp = await transformer.resize(size, size, ResizeFilterType.Nearest).webpLossless()
+				await writeFile(join(path, file + ".webp"), webp)
+			} else {
+				await mkdir(path, { recursive: true })
+				const size = 256 / (2 * Math.abs(zoomN))
+				webp = await transformer.resize(size, size, ResizeFilterType.Nearest).webpLossless()
+				await writeFile(join(path, file + ".webp"), webp)
+			}
 
 			return new Response(webp, {
 				status: 200,

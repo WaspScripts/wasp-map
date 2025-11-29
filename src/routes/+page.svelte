@@ -22,9 +22,9 @@
 	let positionX = $state(0)
 	let positionY = $state(0)
 
-	const size = 256
-	const maxZoom = 8
-	const minZoom = -4
+	const size = $derived(zoom >= 0 ? 256 * (zoom + 1) : 256 / (2 * Math.abs(zoom)))
+	const maxZoom = 4
+	const minZoom = -6
 	const maxPlane = 3
 	const minPlane = 0
 
@@ -46,6 +46,7 @@
 	const bufferY = $derived(Math.ceil(height / size))
 
 	const x1 = $derived(x - bufferX)
+
 	const y1 = $derived(y - bufferY)
 	const x2 = $derived(x + bufferX)
 	const y2 = $derived(y + bufferY)
@@ -132,11 +133,13 @@
 	}
 
 	function onResize() {
-		canvas.width = window.innerWidth
-		canvas.height = window.innerHeight
-		width = canvas.width
-		height = canvas.height
-		drawTiles()
+		if (canvas) {
+			canvas.width = window.innerWidth
+			canvas.height = window.innerHeight
+			width = window.innerWidth
+			height = window.innerHeight
+			drawTiles()
+		}
 	}
 
 	onMount(() => {
@@ -155,12 +158,21 @@
 
 <canvas
 	bind:this={canvas}
+	onwheel={async (event) => {
+		if (event.deltaY > 0) {
+			zoom = Math.max(zoom - 1, minZoom)
+			drawTiles()
+		} else {
+			zoom = Math.min(zoom + 1, maxZoom)
+			drawTiles()
+		}
+	}}
 	onmousedown={(event) => {
 		isDragging = true
 		mouseX = event.clientX
 		mouseY = event.clientY
 	}}
-	onmousemove={(event) => {
+	onmousemove={async (event) => {
 		if (!isDragging) return
 
 		const deltaX = event.clientX - mouseX
@@ -186,8 +198,9 @@
 
 		drawTiles()
 	}}
-	onmouseup={() => (isDragging = false)}
-	onmouseleave={() => (isDragging = false)}
+	onmouseup={async () => (isDragging = false)}
+	onmouseleave={async () => (isDragging = false)}
+	class="cursor-pointer"
 >
 </canvas>
 
@@ -196,8 +209,7 @@
 		<button
 			class="pointer-events-auto btn w-fit cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
 			type="button"
-			onclick={async (e) => {
-				e.preventDefault()
+			onclick={async () => {
 				await navigator.clipboard.writeText(centerTile)
 				copiedCenterTile = true
 				setTimeout(() => (copiedCenterTile = false), 2000)
@@ -233,13 +245,12 @@
 		/>
 	</div>
 
-	<div class="flex flex-col gap-4">
+	<div class="flex flex-col gap-6">
 		<div class="flex flex-col gap-2">
 			<button
 				class="pointer-events-auto btn w-fit cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
 				type="button"
-				onclick={async (e) => {
-					e.preventDefault()
+				onclick={async () => {
 					zoom = Math.min(zoom + 1, maxZoom)
 					drawTiles()
 				}}
@@ -250,8 +261,7 @@
 			<button
 				class="pointer-events-auto btn w-fit cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
 				type="button"
-				onclick={async (e) => {
-					e.preventDefault()
+				onclick={async () => {
 					zoom = Math.max(zoom - 1, minZoom)
 					drawTiles()
 				}}
@@ -264,8 +274,7 @@
 			<button
 				class="pointer-events-auto btn w-fit cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
 				type="button"
-				onclick={async (e) => {
-					e.preventDefault()
+				onclick={async () => {
 					plane = Math.min(plane + 1, maxPlane)
 					drawTiles()
 				}}
@@ -276,8 +285,7 @@
 			<button
 				class="pointer-events-auto btn w-fit cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
 				type="button"
-				onclick={async (e) => {
-					e.preventDefault()
+				onclick={async () => {
 					plane = Math.max(plane - 1, minPlane)
 					drawTiles()
 				}}
