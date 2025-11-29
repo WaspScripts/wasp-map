@@ -16,70 +16,103 @@
 	let x = $state(47)
 	let y = $state(55)
 
+	const minX = 16
+	const maxX = 99
+	const minY = 0
+	const maxY = 199
+
 	let width = $state(0)
 	let height = $state(0)
 
 	const centerX = $derived(Math.round(width / 2))
 	const centerY = $derived(Math.round(height / 2))
 
-	/*
-	const bufferX = $derived(Math.ceil((width / size) * 1.1))
-	const bufferY = $derived(Math.ceil((height / size) * 1.1))
-	*/
-
-	const bufferX = 1
-	const bufferY = 1
+	const bufferX = $derived(Math.ceil(width / size))
+	const bufferY = $derived(Math.ceil(height / size))
 
 	const x1 = $derived(x - bufferX)
 	const y1 = $derived(y - bufferY)
 	const x2 = $derived(x + bufferX)
 	const y2 = $derived(y + bufferY)
 
-	function loadImage(src: string) {
-		return new Promise<HTMLImageElement>((resolve, reject) => {
-			const img = new Image()
-			img.onload = () => resolve(img)
-			img.onerror = () => reject(`Failed to load ${src}`)
-			img.src = src
-		})
+	const tileCache = new Map<string, ImageBitmap | null>()
+	const tilePromises = new Map<string, Promise<ImageBitmap | null>>()
+	const drawQueue: Array<{ key: string; img: ImageBitmap }> = []
+	let drawQueueRunning = false
+
+	async function loadTile(key: string, url: string) {
+		if (tilePromises.has(key)) return tilePromises.get(key)
+
+		const bmp = (async () => {
+			try {
+				const res = await fetch(url)
+				const blob = await res.blob()
+				const bitmap = await createImageBitmap(blob)
+				tileCache.set(key, bitmap)
+				enqueueTileForDraw(key, bitmap)
+				return bitmap
+			} catch {
+				tileCache.set(key, null)
+				return null
+			}
+		})()
+
+		tilePromises.set(key, bmp)
+		return bmp
 	}
 
-	const tileCache = new Map<string, HTMLImageElement>()
+	function processDrawQueue() {
+		const maxPerFrame = 5
+		let i = 0
 
-	async function loadVisibleTiles() {
-		const tiles: { x: number; y: number; img: HTMLImageElement | null }[] = []
+		while (i < maxPerFrame && drawQueue.length > 0) {
+			const { key, img } = drawQueue.shift()!
+			const [xx, yy] = key.split("-").map(Number)
 
-		for (let x = x1; x <= x2; x++) {
-			for (let y = y2; y >= y1; y--) {
-				const key = `${x}-${y}`
-				if (tileCache.has(key)) {
-					tiles.push({ x: x, y: y, img: tileCache.get(key)! })
-					continue
-				}
+			const drawX = centerX + (xx - x) * size + positionX - size / 2
+			const drawY = centerY + (y - yy) * size + positionY - size / 2
 
-				try {
-					const img = await loadImage(`/wasp-map-layers/map/0/${x}-${y}.png`)
-					tileCache.set(key, img)
-					tiles.push({ x: x, y: y, img })
-				} catch (e) {
-					console.error(e)
-					tiles.push({ x: x, y: y, img: null })
-				}
-			}
+			context.drawImage(img, drawX, drawY, size, size)
+			i++
 		}
 
-		return tiles
+		if (drawQueue.length > 0) {
+			requestAnimationFrame(processDrawQueue)
+		} else {
+			drawQueueRunning = false
+		}
 	}
 
-	async function drawTiles() {
-		const tiles = loadVisibleTiles()
+	function enqueueTileForDraw(key: string, img: ImageBitmap) {
+		drawQueue.push({ key, img })
+
+		if (!drawQueueRunning) {
+			drawQueueRunning = true
+			requestAnimationFrame(processDrawQueue)
+		}
+	}
+
+	function drawTiles() {
 		context.clearRect(0, 0, canvas.width, canvas.height)
 
-		for (const tile of await tiles) {
-			if (!tile.img) continue
-			const drawX = centerX + (tile.x - x) * size + positionX - size / 2
-			const drawY = centerY + (y - tile.y) * size + positionY - size / 2
-			context.drawImage(tile.img, drawX, drawY, size, size)
+		for (let xx = x1; xx <= x2; xx++) {
+			for (let yy = y2; yy >= y1; yy--) {
+				const key = `${xx}-${yy}`
+				const cached = tileCache.get(key)
+
+				if (cached) {
+					// Already loaded > draw immediately
+					const drawX = centerX + (xx - x) * size + positionX - size / 2
+					const drawY = centerY + (y - yy) * size + positionY - size / 2
+					context.drawImage(cached, drawX, drawY, size, size)
+				} else {
+					// Not loaded > enqueue async load
+					if (!tilePromises.has(key)) {
+						loadTile(key, `/wasp-map-layers/map/0/${xx}-${yy}.png`)
+					}
+					// Leave tile black
+				}
+			}
 		}
 	}
 
@@ -90,7 +123,7 @@
 		height = canvas.height
 	}
 
-	onMount(async () => {
+	onMount(() => {
 		const ctx = canvas.getContext("2d")
 		if (!ctx) return
 
@@ -98,7 +131,7 @@
 
 		onResize()
 		window.addEventListener("resize", onResize)
-		await drawTiles()
+		drawTiles()
 	})
 
 	let centerTile = $derived(`${x}-${y}`)
@@ -117,21 +150,23 @@
 		const deltaX = event.clientX - mouseX
 		const deltaY = event.clientY - mouseY
 
+		mouseX = event.clientX
+		mouseY = event.clientY
+
 		positionX += deltaX
 		positionY += deltaY
 
 		if (Math.abs(positionX) >= size) {
-			x -= Math.floor(positionX / size)
-			positionX = 0
+			const delta = Math.trunc(positionX / size)
+			x = Math.min(Math.max(x - delta, minX), maxX)
+			positionX -= delta * size
 		}
 
 		if (Math.abs(positionY) >= size) {
-			y += Math.floor(positionY / size)
-			positionY = 0
+			const delta = Math.trunc(positionY / size)
+			y = Math.min(Math.max(y + delta, minY), maxY)
+			positionY -= delta * size
 		}
-
-		mouseX = event.clientX
-		mouseY = event.clientY
 
 		drawTiles()
 	}}
