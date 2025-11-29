@@ -1,6 +1,10 @@
 <script lang="ts">
 	import { onMount } from "svelte"
 
+	const map = "map"
+	const zoom = "0"
+	const plane = "0"
+
 	let canvas: HTMLCanvasElement
 	let context: CanvasRenderingContext2D
 
@@ -16,7 +20,7 @@
 	let x = $state(47)
 	let y = $state(55)
 
-	const minX = 16
+	const minX = 0
 	const maxX = 99
 	const minY = 0
 	const maxY = 199
@@ -108,7 +112,7 @@
 				} else {
 					// Not loaded > enqueue async load
 					if (!tilePromises.has(key)) {
-						loadTile(key, `/wasp-map-layers/map/0/${xx}-${yy}.png`)
+						loadTile(key, `/${map}/${zoom}/${plane}/${xx}-${yy}.webp`)
 					}
 					// Leave tile black
 				}
