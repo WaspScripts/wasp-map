@@ -22,7 +22,7 @@
 	let positionX = $state(0)
 	let positionY = $state(0)
 
-	const size = $derived(zoom >= 0 ? 256 * (zoom + 1) : 256 / (2 * Math.abs(zoom)))
+	const size = $derived(zoom >= 0 ? 256 * (zoom + 1) : 256)
 	const maxZoom = 4
 	const minZoom = -6
 	const maxPlane = 3
@@ -42,14 +42,18 @@
 	const centerX = $derived(Math.round(width / 2))
 	const centerY = $derived(Math.round(height / 2))
 
-	const bufferX = $derived(Math.ceil(width / size))
-	const bufferY = $derived(Math.ceil(height / size))
+	const step = $derived(zoom >= 0 ? 1 : 2 ** -zoom)
+	const bufferX = $derived(Math.ceil((width / size) * step))
+	const bufferY = $derived(Math.ceil((height / size) * step))
 
 	const x1 = $derived(x - bufferX)
-
 	const y1 = $derived(y - bufferY)
 	const x2 = $derived(x + bufferX)
 	const y2 = $derived(y + bufferY)
+
+	const nearest = $derived(4 * Math.pow(2, -zoom - 1))
+	const startX = $derived(step === 1 ? x1 : Math.floor(x1 / nearest) * nearest)
+	const startY = $derived(step === 1 ? y2 : Math.floor(y2 / nearest) * nearest)
 
 	const tileCache = new Map<string, ImageBitmap | null>()
 	const tilePromises = new Map<string, Promise<ImageBitmap | null>>()
@@ -85,8 +89,8 @@
 			const { key, img } = drawQueue.shift()!
 			const [, , , xx, yy] = key.split("-").map(Number)
 
-			const drawX = centerX + (xx - x) * size + positionX - size / 2
-			const drawY = centerY + (y - yy) * size + positionY - size / 2
+			const drawX = centerX + ((xx - x) / step) * size + positionX - size / 2
+			const drawY = centerY + ((y - yy) / step) * size + positionY - size / 2
 
 			context.drawImage(img, drawX, drawY, size, size)
 			i++
@@ -111,22 +115,19 @@
 	function drawTiles() {
 		context.clearRect(0, 0, canvas.width, canvas.height)
 
-		for (let xx = x1; xx <= x2; xx++) {
-			for (let yy = y2; yy >= y1; yy--) {
+		for (let xx = startX; xx <= x2; xx += step) {
+			for (let yy = startY; yy >= y1; yy -= step) {
 				const key = `${map}-${zoom}-${plane}-${xx}-${yy}`
 				const cached = tileCache.get(key)
 
 				if (cached) {
-					// Already loaded > draw immediately
-					const drawX = centerX + (xx - x) * size + positionX - size / 2
-					const drawY = centerY + (y - yy) * size + positionY - size / 2
+					const drawX = centerX + ((xx - x) / step) * size + positionX - size / 2
+					const drawY = centerY + ((y - yy) / step) * size + positionY - size / 2
 					context.drawImage(cached, drawX, drawY, size, size)
 				} else {
-					// Not loaded > enqueue async load
 					if (!tilePromises.has(key)) {
 						loadTile(key, `/${map}/${zoom}/${plane}/${xx}-${yy}.webp`)
 					}
-					// Leave tile black
 				}
 			}
 		}
@@ -158,7 +159,7 @@
 
 <canvas
 	bind:this={canvas}
-	onwheel={async (event) => {
+	onwheel={(event) => {
 		if (event.deltaY > 0) {
 			zoom = Math.max(zoom - 1, minZoom)
 			drawTiles()
@@ -172,7 +173,7 @@
 		mouseX = event.clientX
 		mouseY = event.clientY
 	}}
-	onmousemove={async (event) => {
+	onmousemove={(event) => {
 		if (!isDragging) return
 
 		const deltaX = event.clientX - mouseX
@@ -184,22 +185,22 @@
 		positionX += deltaX
 		positionY += deltaY
 
-		if (Math.abs(positionX) >= size) {
-			const delta = Math.trunc(positionX / size)
+		if (Math.abs(positionX) >= size / step) {
+			const delta = Math.trunc(positionX / size / step)
 			x = Math.min(Math.max(x - delta, minX), maxX)
-			positionX -= delta * size
+			positionX -= delta * (size / step)
 		}
 
-		if (Math.abs(positionY) >= size) {
-			const delta = Math.trunc(positionY / size)
+		if (Math.abs(positionY) >= size / step) {
+			const delta = Math.trunc(positionY / size / step)
 			y = Math.min(Math.max(y + delta, minY), maxY)
-			positionY -= delta * size
+			positionY -= delta * (size / step)
 		}
 
 		drawTiles()
 	}}
-	onmouseup={async () => (isDragging = false)}
-	onmouseleave={async () => (isDragging = false)}
+	onmouseup={() => (isDragging = false)}
+	onmouseleave={() => (isDragging = false)}
 	class="cursor-pointer"
 >
 </canvas>
