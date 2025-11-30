@@ -2,7 +2,7 @@ import { NODE_ENV } from "$env/static/public"
 import { error } from "@sveltejs/kit"
 import { mkdir, readFile, writeFile } from "fs/promises"
 import { join } from "path"
-import { FastResizeFilter, ResizeFilterType, Transformer } from "@napi-rs/image"
+import { FastResizeFilter, Transformer } from "@napi-rs/image"
 
 const imgSize = 256 * 256 * 4
 const steps = [0, 1, 2, 4, 8, 16, 32]
