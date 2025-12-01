@@ -1,10 +1,10 @@
-import { NODE_ENV } from "$env/static/public"
 import { error } from "@sveltejs/kit"
 import { mkdir, readFile, writeFile } from "fs/promises"
 import { join } from "path"
 import { FastResizeFilter, Transformer } from "@napi-rs/image"
 
-const imgSize = 256 * 256 * 4
+const TILE_SIZE = 256
+const imgSize = TILE_SIZE * TILE_SIZE * 4
 const steps = [0, 1, 2, 4, 8, 16, 32]
 const empty = await readFile(join(".", "static", "empty.webp"))
 
@@ -27,7 +27,7 @@ async function upscaled(x: number, y: number, zoom: number, map: string, plane: 
 	let transformer = new Transformer(png)
 
 	if (zoom > 0) {
-		const size = (zoom + 1) * 256
+		const size = (zoom + 1) * TILE_SIZE
 		transformer = transformer.fastResize({ width: size, height: size, filter: FastResizeFilter.Box })
 	}
 
@@ -41,6 +41,15 @@ async function upscaled(x: number, y: number, zoom: number, map: string, plane: 
 }
 
 async function downscale(x: number, y: number, zoom: number, step: number, map: string, plane: string) {
+	const path = join(process.cwd(), "cache", map, zoom.toString(), plane)
+	const file = x + "-" + y
+	const filePath = join(path, file + ".webp")
+
+	const fileBuffer = await readFile(filePath).catch(() => null)
+	if (fileBuffer) return fileBuffer
+
+	await mkdir(path, { recursive: true }).catch(() => undefined)
+
 	if (zoom == 0) {
 		return await upscaled(x, y, zoom, map, plane)
 	}
@@ -52,20 +61,16 @@ async function downscale(x: number, y: number, zoom: number, step: number, map: 
 		{ x: x + step, y: y - step }
 	]
 
-	const path = join(process.cwd(), "cache", map, zoom.toString(), plane)
 	const bufferPromises = []
-	const prevZoom = zoom + 1
+	const nextZoom = zoom + 1
+	const nextStep = steps[-nextZoom] // Adjusted: Use nextZoom to get the correct step for the child tiles
+
 	for (let i = 0; i < files.length; i++) {
-		const filePath = join(path, files[i].x + "-" + files[i].y + ".webp")
-		bufferPromises.push(
-			readFile(filePath).catch(async () => {
-				return await downscale(files[i].x, files[i].y, prevZoom, steps[-prevZoom], map, plane)
-			})
-		)
+		bufferPromises.push(downscale(files[i].x, files[i].y, nextZoom, nextStep, map, plane))
 	}
 
 	const buffers = await Promise.all(bufferPromises)
-	const transformer = Transformer.fromRgbaPixels(new Uint8ClampedArray(imgSize), 256, 256)
+	const transformer = Transformer.fromRgbaPixels(new Uint8ClampedArray(imgSize), TILE_SIZE, TILE_SIZE)
 
 	const coordinates = [
 		{ x: 0, y: 0 },
@@ -91,7 +96,17 @@ async function downscale(x: number, y: number, zoom: number, step: number, map: 
 		transformer.overlay(resizedBuffers[i], coordinates[i].x, coordinates[i].y)
 	}
 
-	return await transformer.webp()
+	const webp = await transformer.webp().catch((e) => {
+		console.error(e)
+		return null
+	})
+
+	if (!webp) return Buffer.from(empty)
+
+	await writeFile(filePath, webp).catch((e) => console.error(e))
+	console.log(`[Cache Miss/Generated] Downscaled tile: ${file} at zoom ${zoom}`)
+
+	return webp
 }
 
 export const GET = async ({ params: { map, zoom, plane, x, y } }) => {
@@ -137,7 +152,7 @@ export const GET = async ({ params: { map, zoom, plane, x, y } }) => {
 			Source: "Computed",
 			"Content-Type": "image/webp",
 			"Content-Length": webp.length.toString(),
-			"Cache-Control": `max-age=${NODE_ENV == "production" ? "3600" : "0"}, s-maxage=3600`
+			"Cache-Control": `max-age=${process.env.NODE_ENV == "production" ? "3600" : "0"}, s-maxage=3600`
 		}
 	})
 }
