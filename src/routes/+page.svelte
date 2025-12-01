@@ -11,11 +11,13 @@
 	import MapMinus from "@lucide/svelte/icons/map-minus"
 	import MapPlus from "@lucide/svelte/icons/map-plus"
 	import { Switch } from "@skeletonlabs/skeleton-svelte"
+	import { page } from "$app/state"
+	import { goto } from "$app/navigation"
 
 	const TILE_SIZE = 4
 	const MAP_TILE_SIZE = 256
-	const maxZoom = 2
-	const minZoom = -2
+	const maxZoom = 4
+	const minZoom = -4
 	const maxPlane = 3
 	const minPlane = 0
 	const minX = 0
@@ -23,9 +25,9 @@
 	const minY = 0
 	const maxY = 199
 
-	let map = $state("map")
+	let map = $state(page.url.searchParams.get("map") ?? "map")
 	let zoom = $state(0)
-	let plane = $state(0)
+	let plane = 0
 	let search = $state("")
 	let grid = $state(true)
 	let simbaCoordinates = $state(true)
@@ -203,10 +205,36 @@
 		positionX = 0
 		positionY = 0
 		requestAnimationFrame(drawTiles)
+		let query = new URLSearchParams(page.url.searchParams.toString())
+		query.set("zoom", zoom.toString())
+		goto(`?${query.toString()}`)
 	}
 
 	function clamp(value: number, min: number, max: number) {
 		return Math.min(max, Math.max(min, value))
+	}
+
+	function getCookie(cname: string) {
+		let name = cname + "="
+		let decodedCookie = decodeURIComponent(document.cookie)
+		let ca = decodedCookie.split(";")
+		for (let i = 0; i < ca.length; i++) {
+			let c = ca[i]
+			while (c.charAt(0) == " ") {
+				c = c.substring(1)
+			}
+			if (c.indexOf(name) == 0) {
+				return c.substring(name.length, c.length)
+			}
+		}
+		return ""
+	}
+
+	function setCookie(cname: string, cvalue: string, exdays: number) {
+		const d = new Date()
+		d.setTime(d.getTime() + exdays * 24 * 60 * 60 * 1000)
+		let expires = "expires=" + d.toUTCString()
+		document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/"
 	}
 
 	//listeners
@@ -252,6 +280,9 @@
 		window.addEventListener("resize", onResize)
 		document.addEventListener("keydown", onKeyboard)
 		onResize()
+
+		if (getCookie("grid") != "") grid = getCookie("grid") === "true"
+		if (getCookie("simbacoords") != "") simbaCoordinates = getCookie("simbacoords") === "true"
 
 		return () => {
 			window.removeEventListener("resize", onResize)
@@ -351,7 +382,12 @@
 			<select
 				class="pointer-events-auto select btn w-32 bg-surface-500/80 p-2"
 				bind:value={map}
-				onchange={() => requestAnimationFrame(drawTiles)}
+				onchange={() => {
+					requestAnimationFrame(drawTiles)
+					let query = new URLSearchParams(page.url.searchParams.toString())
+					query.set("map", map)
+					goto(`?${query.toString()}`)
+				}}
 			>
 				<option value="map">Map</option>
 				<option value="heightmap">Heightmap</option>
@@ -377,7 +413,12 @@
 			class="pointer-events-auto input w-64 bg-surface-500/80"
 			bind:value={search}
 			placeholder="🔎 Search..."
-			onchange={() => requestAnimationFrame(drawTiles)}
+			onchange={() => {
+				requestAnimationFrame(drawTiles)
+				let query = new URLSearchParams(page.url.searchParams.toString())
+				query.set("search", search)
+				goto(`?${query.toString()}`)
+			}}
 		/>
 	</div>
 
@@ -430,6 +471,7 @@
 			onCheckedChange={(e) => {
 				grid = e.checked
 				requestAnimationFrame(drawTiles)
+				setCookie("grid", grid.toString(), 360)
 			}}
 		>
 			<Switch.Control class="scale-150 preset-outlined-surface-500 bg-surface-500/80">
@@ -453,6 +495,7 @@
 			defaultChecked={simbaCoordinates}
 			onCheckedChange={(e) => {
 				simbaCoordinates = e.checked
+				setCookie("simbacoords", simbaCoordinates.toString(), 360)
 			}}
 		>
 			<Switch.Control class="scale-150 preset-outlined-surface-500 bg-surface-500/80">

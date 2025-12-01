@@ -104,7 +104,6 @@ async function downscale(x: number, y: number, zoom: number, step: number, map: 
 	if (!webp) return Buffer.from(empty)
 
 	await writeFile(filePath, webp).catch((e) => console.error(e))
-	console.log(`[Cache Miss/Generated] Downscaled tile: ${file} at zoom ${zoom}`)
 
 	return webp
 }
