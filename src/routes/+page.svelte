@@ -26,7 +26,7 @@
 	const maxY = 199
 
 	let map = $state(page.url.searchParams.get("map") ?? "map")
-	let zoom = $state(0)
+	let zoom = $state(Number(page.url.searchParams.get("zoom") ?? "0"))
 	let plane = 0
 	let search = $state("")
 	let grid = $state(true)
@@ -362,7 +362,7 @@
 			</button>
 
 			<button
-				class="pointer-events-auto btn w-fit cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
+				class="pointer-events-auto btn w-fit cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80 text-sm"
 				class:text-success-500={copiedChunk}
 				type="button"
 				onclick={async () => {
@@ -380,7 +380,7 @@
 			</button>
 
 			<select
-				class="pointer-events-auto select btn w-32 bg-surface-500/80 p-2"
+				class="pointer-events-auto select btn w-32 bg-surface-500/80 p-2 text-sm"
 				bind:value={map}
 				onchange={() => {
 					requestAnimationFrame(drawTiles)
