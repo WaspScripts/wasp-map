@@ -129,7 +129,6 @@ async function downscale(map: string, x: number, y: number, zoom: number, plane:
 					})
 					.bmp()
 			} catch (e) {
-				console.error("Error reading image data: " + filePath + ": " + JSON.stringify(e))
 				img = Buffer.from(empty)
 			}
 			return img
@@ -157,10 +156,13 @@ async function startDownscale(map: string) {
 	const start = performance.now()
 	const step = steps[-minZoom]
 
-	for (let plane = minPlane; plane <= maxPlane; plane++) {
-		for (let y = scope.y1; y <= scope.y2; y++) {
-			for (let x = scope.x1; x <= scope.x2; x++) {
-				await downscale(map, x, y, minZoom, plane, step)
+	for (let zoom = 0; zoom >= minZoom; zoom--) {
+		for (let plane = minPlane; plane <= maxPlane; plane++) {
+			console.log("Downscaling zoom ", zoom, " plane ", plane)
+			for (let y = scope.y1; y <= scope.y2; y++) {
+				for (let x = scope.x1; x <= scope.x2; x++) {
+					await downscale(map, x, y, zoom, plane, step)
+				}
 			}
 		}
 	}
@@ -174,6 +176,7 @@ async function startUpscale(map: string) {
 
 	for (let zoom = 0; zoom <= maxZoom; zoom++) {
 		for (let plane = minPlane; plane <= maxPlane; plane++) {
+			console.log("Upscaling zoom ", zoom, " plane ", plane)
 			for (let y = scope.y1; y <= scope.y2; y++) {
 				for (let x = scope.x1; x <= scope.x2; x++) {
 					await upscale(map, x, y, zoom, plane)
