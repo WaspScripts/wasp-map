@@ -1,7 +1,7 @@
 import { error } from "@sveltejs/kit"
 import { mkdir, readFile, writeFile } from "fs/promises"
 import { join } from "path"
-import { FastResizeFilter, Transformer } from "@napi-rs/image"
+import { FastResizeFilter, ResizeFilterType, Transformer } from "@napi-rs/image"
 
 const TILE_SIZE = 256
 const imgSize = TILE_SIZE * TILE_SIZE * 4
@@ -28,10 +28,10 @@ async function upscaled(x: number, y: number, zoom: number, map: string, plane: 
 
 	if (zoom > 0) {
 		const size = (zoom + 1) * TILE_SIZE
-		transformer = transformer.fastResize({ width: size, height: size, filter: FastResizeFilter.Box })
+		transformer = transformer.resize({ width: size, height: size, filter: ResizeFilterType.Nearest })
 	}
 
-	const webp = await transformer.webp().catch((e) => {
+	const webp = await transformer.webpLossless().catch((e) => {
 		console.error(e)
 		return null
 	})
