@@ -13,6 +13,7 @@
 	import { Switch } from "@skeletonlabs/skeleton-svelte"
 	import { page } from "$app/state"
 	import { goto } from "$app/navigation"
+	import { getCookie, setCookie } from "$lib/utils"
 
 	const TILE_SIZE = 4
 	const MAP_TILE_SIZE = 256
@@ -212,29 +213,6 @@
 
 	function clamp(value: number, min: number, max: number) {
 		return Math.min(max, Math.max(min, value))
-	}
-
-	function getCookie(cname: string) {
-		let name = cname + "="
-		let decodedCookie = decodeURIComponent(document.cookie)
-		let ca = decodedCookie.split(";")
-		for (let i = 0; i < ca.length; i++) {
-			let c = ca[i]
-			while (c.charAt(0) == " ") {
-				c = c.substring(1)
-			}
-			if (c.indexOf(name) == 0) {
-				return c.substring(name.length, c.length)
-			}
-		}
-		return ""
-	}
-
-	function setCookie(cname: string, cvalue: string, exdays: number) {
-		const d = new Date()
-		d.setTime(d.getTime() + exdays * 24 * 60 * 60 * 1000)
-		let expires = "expires=" + d.toUTCString()
-		document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/"
 	}
 
 	//listeners
