@@ -17,8 +17,13 @@
 
 	const TILE_SIZE = 4
 	const MAP_TILE_SIZE = 256
-	const maxZoom = 4
+	const maxZoom = 0
 	const minZoom = -4
+	const trueMaxZoom = 6
+	const trueMinZoom = -6
+
+	const multipliers = [0.5, 0.75, 1, 1, 1, 1, 1, 2, 4, 8, 16, 32, 64]
+
 	const maxPlane = 3
 	const minPlane = 0
 	const minX = 0
@@ -27,13 +32,15 @@
 	const maxY = 199
 
 	let map = $state(page.url.searchParams.get("map") ?? "map")
-	let zoom = $state(Number(page.url.searchParams.get("zoom") ?? "0"))
-	let plane = 0
+
+	let trueZoom = $state(Number(page.url.searchParams.get("zoom") ?? "0"))
+	let zoom = $derived(clamp(trueZoom, minZoom, maxZoom))
+	let plane = $state(clamp(Number(page.url.searchParams.get("plane") ?? "0"), minPlane, maxPlane))
 	let search = $state("")
 	let grid = $state(true)
-	let simbaCoordinates = $state(true)
-	let copiedChunk = $state(false)
-	let copiedCoordinate = $state(false)
+	let coordinates = $state(true)
+	let copied = $state([false, false])
+	const multiplier = $derived(multipliers[trueZoom + Math.abs(trueMinZoom)])
 
 	let canvas: HTMLCanvasElement
 	let context: CanvasRenderingContext2D
@@ -47,32 +54,31 @@
 
 	let x = 47
 	let y = 55
+
 	let width = 0
 	let height = 0
 
-	const size = $derived(zoom >= 0 ? MAP_TILE_SIZE * (zoom + 1) : MAP_TILE_SIZE)
+	const size = $derived(zoom == trueZoom ? MAP_TILE_SIZE : MAP_TILE_SIZE * multiplier)
 
-	const centerX = $derived(Math.round(width / 2))
-	const centerY = $derived(Math.round(height / 2))
+	const halfSize = $derived(size / 2)
 
-	const step = $derived(zoom >= 0 ? 1 : 2 ** -zoom)
+	const centerX = $derived(width / 2)
+	const centerY = $derived(height / 2)
+
+	const step = $derived(trueZoom >= 0 ? 1 : 2 ** -trueZoom)
 
 	const effectiveTileSize = $derived(size / step)
 
-	const screenMapUnitsX = $derived((width / size) * step)
-	const screenMapUnitsY = $derived((height / size) * step)
+	const bufferX = $derived(Math.ceil(((width / size) * step) / 2) + 2 * step)
+	const bufferY = $derived(Math.ceil(((height / size) * step) / 2) + 2 * step)
 
-	const bufferX = $derived(Math.ceil(screenMapUnitsX / 2) + 2 * step)
-	const bufferY = $derived(Math.ceil(screenMapUnitsY / 2) + 2 * step)
+	const x1 = $derived(Math.max(step === 1 ? x - bufferX : Math.floor((x - bufferX) / step) * step, minX))
+	const y1 = $derived(Math.max(y - bufferY, minY))
+	const x2 = $derived(Math.min(x + bufferX, maxX))
+	const y2 = $derived(Math.min(step === 1 ? y + bufferY : Math.floor((y + bufferY) / step) * step, maxY))
 
-	const x1 = $derived(x - bufferX)
-	const y1 = $derived(y - bufferY)
-	const x2 = $derived(x + bufferX)
-	const y2 = $derived(y + bufferY)
-
-	const nearest = $derived(4 * Math.pow(2, -zoom - 1))
-	const startX = $derived(step === 1 ? x1 : Math.floor(x1 / nearest) * nearest)
-	const startY = $derived(step === 1 ? y2 : Math.floor(y2 / nearest) * nearest)
+	$inspect("Center: ", x, ", ", y)
+	$inspect("[", x1, ",", y1, ",", x2, ",", y2, "]")
 
 	const tileCache = new Map<string, ImageBitmap | null>()
 	const tilePromises = new Map<string, Promise<ImageBitmap | null>>()
@@ -82,15 +88,21 @@
 
 	const hoveredChunk = $derived(`${Math.floor(mouseMapX)},${Math.floor(mouseMapY)}`)
 
-	const rsX = $derived(Math.round((mouseMapX * MAP_TILE_SIZE) / TILE_SIZE))
-	const rsY = $derived(Math.round((mouseMapY * MAP_TILE_SIZE) / TILE_SIZE))
+	const hoverX = $derived((Math.round((mouseMapX * MAP_TILE_SIZE) / TILE_SIZE) * TILE_SIZE) / MAP_TILE_SIZE)
 
-	const mapX = $derived(rsX * 4)
-	const mapY = $derived(rsY * 4)
-	const scaledTile = $derived((TILE_SIZE * size) / MAP_TILE_SIZE)
+	const hoverY = $derived(
+		(Math.round(((mouseMapY - 1) * MAP_TILE_SIZE) / TILE_SIZE) * TILE_SIZE) / MAP_TILE_SIZE
+	)
 
-	function getKey(x: number, y: number) {
-		return `${map}-${zoom}-${plane}-${x}-${y}`
+	const rsX = $derived(Math.round(hoverX * MAP_TILE_SIZE))
+	const rsY = $derived(Math.round((hoverY + 1) * MAP_TILE_SIZE) - TILE_SIZE * 2)
+
+	const getKey = (x: number, y: number) => `${map}-${zoom}-${plane}-${x}-${y}`
+
+	async function copyToClipboard(index: number, value: string) {
+		await navigator.clipboard.writeText(value)
+		copied[index] = true
+		setTimeout(() => (copied[index] = false), 2000)
 	}
 
 	async function loadTile(key: string, url: string) {
@@ -115,10 +127,10 @@
 		return bmp
 	}
 
-	function mapToScreen(vx: number, vy: number, hlfSize: number) {
+	function mapToScreen(vx: number, vy: number) {
 		return {
-			x: centerX + ((vx - x) / step) * size - hlfSize,
-			y: centerY + ((y - vy) / step) * size - hlfSize
+			x: Math.round(centerX + ((vx - x) / step) * size - halfSize),
+			y: Math.round(centerY + ((y - vy) / step) * size - halfSize)
 		}
 	}
 
@@ -127,39 +139,42 @@
 
 		context.save()
 		context.translate(positionX, positionY)
-
-		const halfSize = size / 2
 		const data: { drawX: number; drawY: number; x: number; y: number }[] = []
 
-		for (let xx = Math.max(startX, minX); xx <= Math.min(x2, maxX); xx += step) {
-			for (let yy = Math.min(startY, maxY); yy >= Math.max(y1, minY); yy -= step) {
-				const key = getKey(xx, yy)
+		context.imageSmoothingEnabled = false
+
+		for (let x = x1; x <= x2; x += step) {
+			console.log(x)
+			for (let y = y2; y >= y1; y -= step) {
+				const key = getKey(x, y)
 				const cached = tileCache.get(key)
-				const { x: drawX, y: drawY } = mapToScreen(xx, yy, halfSize)
-				data.push({ drawX, drawY, x: xx, y: yy })
+				const { x: drawX, y: drawY } = mapToScreen(x, y)
+				data.push({ drawX, drawY, x, y })
+
+				if (cached === null) continue
 
 				if (cached) {
 					context.drawImage(cached, drawX, drawY, size, size)
-				} else if (cached === undefined) {
-					if (!tilePromises.has(key)) {
-						loadTile(key, `/${map}/${zoom}/${plane}/${xx}-${yy}.webp`)
-					}
+					continue
+				}
+
+				if (!tilePromises.has(key)) {
+					loadTile(key, `/api/${map}/${zoom}/${plane}/${x}-${y}.webp`)
 				}
 			}
 		}
 
-		if (zoom >= -2) {
+		if (trueZoom >= -2) {
 			if (grid) {
-				const sub = size / step
-				const fontSize = 32 * (sub / MAP_TILE_SIZE)
+				const fontSize = 32 * (effectiveTileSize / MAP_TILE_SIZE)
 
 				context.font = `normal ${fontSize}px Courier New`
 				context.textAlign = "center"
 				context.textBaseline = "middle"
 				context.fillStyle = "white"
-				context.lineWidth = (2 * sub) / MAP_TILE_SIZE
-				context.strokeStyle = "white"
+				context.lineWidth = (2 * effectiveTileSize) / MAP_TILE_SIZE
 
+				const mid = effectiveTileSize / 2
 				for (let i = 0; i < data.length; i++) {
 					const tile = data[i]
 
@@ -170,15 +185,17 @@
 							const ty = tile.y - sy
 							if (ty < minY || ty > maxY) continue
 
-							const gx = tile.drawX + sx * sub
-							const gy = tile.drawY + sy * sub
+							const gx = tile.drawX + sx * effectiveTileSize
+							const gy = tile.drawY + sy * effectiveTileSize
 
-							context.strokeRect(gx, gy, sub, sub)
+							context.strokeStyle = trueZoom >= 0 ? "white" : "rgba(255, 255, 255, 0.5)"
+							context.strokeRect(gx, gy, effectiveTileSize, effectiveTileSize)
 
-							const textX = gx + sub / 2
-							const textY = gy + sub / 2
+							const textX = gx + mid
+							const textY = gy + mid
 
 							const label = `${tx},${ty}`
+							context.strokeStyle = "white"
 							context.strokeText(label, textX, textY)
 							context.fillText(label, textX, textY)
 						}
@@ -186,28 +203,36 @@
 				}
 			}
 
-			let approxX = (rsX * TILE_SIZE) / MAP_TILE_SIZE
-			let approxY = (Math.round(((mouseMapY - 1) * MAP_TILE_SIZE) / TILE_SIZE) * TILE_SIZE) / MAP_TILE_SIZE
+			if (trueZoom >= 1) {
+				const { x: drawX, y: drawY } = mapToScreen(hoverX, hoverY)
 
-			const { x: drawX, y: drawY } = mapToScreen(approxX, approxY, halfSize)
-
-			context.lineWidth = 2
-			context.fillStyle = "rgba(255, 165, 0, 0.3)"
-			context.fillRect(drawX, drawY, scaledTile, scaledTile)
-			context.strokeStyle = "orange"
-			context.strokeRect(drawX, drawY, scaledTile, scaledTile)
+				context.lineWidth = 2
+				context.fillStyle = "rgba(255, 165, 0, 0.3)"
+				const scaled = Math.round(multiplier * TILE_SIZE)
+				context.fillRect(drawX, drawY, scaled, scaled)
+				context.strokeStyle = "orange"
+				context.strokeRect(drawX, drawY, scaled, scaled)
+			}
 		}
 
 		context.restore()
 	}
 
-	function handleZoom(delta: number) {
-		zoom = Math.min(maxZoom, Math.max(minZoom, zoom + (delta > 0 ? -1 : 1)))
-		positionX = 0
-		positionY = 0
+	function changeZoom(value: number) {
+		trueZoom = clamp(trueZoom + value, trueMinZoom, trueMaxZoom)
+
 		requestAnimationFrame(drawTiles)
 		let query = new URLSearchParams(page.url.searchParams.toString())
-		query.set("zoom", zoom.toString())
+		query.set("zoom", trueZoom.toString())
+		goto(`?${query.toString()}`)
+	}
+
+	function changePlane(value: number) {
+		plane = clamp(plane + value, minPlane, maxPlane)
+
+		requestAnimationFrame(drawTiles)
+		let query = new URLSearchParams(page.url.searchParams.toString())
+		query.set("plane", plane.toString())
 		goto(`?${query.toString()}`)
 	}
 
@@ -232,16 +257,12 @@
 		switch (e.code) {
 			case "Space":
 				e.preventDefault()
-				await navigator.clipboard.writeText(simbaCoordinates ? `${mapX}, ${mapY}` : `${rsX}, ${rsY}`)
-				copiedCoordinate = true
-				setTimeout(() => (copiedCoordinate = false), 2000)
+				await copyToClipboard(0, coordinates ? `${rsX}, ${rsY}` : `${rsX / TILE_SIZE}, ${rsY / TILE_SIZE}`)
 				break
 
 			case "KeyC":
 				e.preventDefault()
-				await navigator.clipboard.writeText(hoveredChunk)
-				copiedChunk = true
-				setTimeout(() => (copiedChunk = false), 2000)
+				await copyToClipboard(1, hoveredChunk)
 				break
 
 			default:
@@ -254,13 +275,14 @@
 		if (!ctx) return
 
 		context = ctx
+		context.imageSmoothingEnabled = false
 
 		window.addEventListener("resize", onResize)
 		document.addEventListener("keydown", onKeyboard)
 		onResize()
 
 		if (getCookie("grid") != "") grid = getCookie("grid") === "true"
-		if (getCookie("simbacoords") != "") simbaCoordinates = getCookie("simbacoords") === "true"
+		if (getCookie("simbacoords") != "") coordinates = getCookie("simbacoords") === "true"
 
 		return () => {
 			window.removeEventListener("resize", onResize)
@@ -273,7 +295,7 @@
 	bind:this={canvas}
 	onwheel={(event) => {
 		event.preventDefault()
-		handleZoom(event.deltaY)
+		changeZoom(event.deltaY >= 0 ? -1 : 1)
 	}}
 	onmousedown={(event) => {
 		isDragging = true
@@ -281,19 +303,20 @@
 		mouseY = event.clientY
 	}}
 	onmousemove={(event) => {
-		mouseMapX = ((event.clientX - positionX - centerX + size / 2) / size) * step + x
-		mouseMapY = ((event.clientY - positionY - centerY + size / 2) / size) * step * -1 + y + 1
+		const { clientX, clientY } = event
+		mouseMapX = clamp(((clientX - positionX - centerX + halfSize) / size) * step + x, minX, maxX)
+		mouseMapY = clamp(y + 1 - ((clientY - positionY - centerY + halfSize) / size) * step, minY, maxY)
 
 		if (!isDragging) {
 			requestAnimationFrame(drawTiles)
 			return
 		}
 
-		const deltaX = event.clientX - mouseX
-		const deltaY = event.clientY - mouseY
+		const deltaX = clientX - mouseX
+		const deltaY = clientY - mouseY
 
-		mouseX = event.clientX
-		mouseY = event.clientY
+		mouseX = clientX
+		mouseY = clientY
 
 		positionX += deltaX
 		positionY += deltaY
@@ -314,7 +337,7 @@
 	}}
 	onmouseup={() => (isDragging = false)}
 	onmouseleave={() => (isDragging = false)}
-	class="cursor-grab active:cursor-grabbing"
+	class=" active:cursor-grabbing"
 >
 </canvas>
 
@@ -323,16 +346,13 @@
 		<div class="flex flex-col gap-2">
 			<button
 				class="pointer-events-auto btn w-fit cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80 text-sm"
-				class:text-success-500={copiedCoordinate}
+				class:text-success-500={copied[0]}
 				type="button"
-				onclick={async () => {
-					await navigator.clipboard.writeText(simbaCoordinates ? `${mapX}, ${mapY}` : `${rsX}, ${rsY}`)
-					copiedCoordinate = true
-					setTimeout(() => (copiedCoordinate = false), 2000)
-				}}
+				onclick={async () =>
+					await copyToClipboard(0, coordinates ? `${rsX}, ${rsY}` : `${rsX / TILE_SIZE}, ${rsY / TILE_SIZE}`)}
 			>
-				{simbaCoordinates ? `Coordinate: ${mapX}, ${mapY}` : `RSCoordinate: ${rsX}, ${rsY}`}
-				{#if copiedCoordinate}
+				{coordinates ? `Coordinate: ${rsX}, ${rsY}` : `RSCoordinate: ${rsX / TILE_SIZE}, ${rsY / TILE_SIZE}`}
+				{#if copied[0]}
 					<ClipboardCheck class="h-4" />
 				{:else}
 					<Clipboard class="h-4" />
@@ -341,16 +361,12 @@
 
 			<button
 				class="pointer-events-auto btn w-fit cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80 text-sm"
-				class:text-success-500={copiedChunk}
+				class:text-success-500={copied[1]}
 				type="button"
-				onclick={async () => {
-					await navigator.clipboard.writeText(hoveredChunk)
-					copiedChunk = true
-					setTimeout(() => (copiedChunk = false), 2000)
-				}}
+				onclick={async () => await copyToClipboard(1, hoveredChunk)}
 			>
 				Chunk: {hoveredChunk}
-				{#if copiedChunk}
+				{#if copied[1]}
 					<ClipboardCheck class="h-4" />
 				{:else}
 					<Clipboard class="h-4" />
@@ -405,7 +421,7 @@
 			<button
 				class="pointer-events-auto btn h-8 w-14 cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
 				type="button"
-				onclick={() => handleZoom(0)}
+				onclick={() => changeZoom(1)}
 			>
 				<ZoomIn class="h-4" />
 			</button>
@@ -413,7 +429,7 @@
 			<button
 				class="pointer-events-auto btn h-8 w-14 cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
 				type="button"
-				onclick={() => handleZoom(1)}
+				onclick={() => changeZoom(-1)}
 			>
 				<ZoomOut class="h-4" />
 			</button>
@@ -423,10 +439,7 @@
 			<button
 				class="pointer-events-auto btn h-8 w-14 cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
 				type="button"
-				onclick={() => {
-					plane = clamp(plane + 1, minPlane, maxPlane)
-					requestAnimationFrame(drawTiles)
-				}}
+				onclick={() => changePlane(1)}
 			>
 				<ArrowUp class="h-4" />
 			</button>
@@ -434,10 +447,7 @@
 			<button
 				class="pointer-events-auto btn h-8 w-14 cursor-pointer rounded-md preset-outlined-surface-500 bg-surface-500/80"
 				type="button"
-				onclick={() => {
-					plane = clamp(plane - 1, minPlane, maxPlane)
-					requestAnimationFrame(drawTiles)
-				}}
+				onclick={() => changePlane(-1)}
 			>
 				<ArrowDown class="h-4" />
 			</button>
@@ -445,7 +455,7 @@
 
 		<Switch
 			class="pointer-events-auto mx-auto"
-			defaultChecked={grid}
+			checked={grid}
 			onCheckedChange={(e) => {
 				grid = e.checked
 				requestAnimationFrame(drawTiles)
@@ -470,10 +480,10 @@
 
 		<Switch
 			class="pointer-events-auto mx-auto"
-			defaultChecked={simbaCoordinates}
+			checked={coordinates}
 			onCheckedChange={(e) => {
-				simbaCoordinates = e.checked
-				setCookie("simbacoords", simbaCoordinates.toString(), 360)
+				coordinates = e.checked
+				setCookie("simbacoords", coordinates.toString(), 360)
 			}}
 		>
 			<Switch.Control class="scale-150 preset-outlined-surface-500 bg-surface-500/80">

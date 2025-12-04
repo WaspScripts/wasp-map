@@ -2,28 +2,44 @@ import { error } from "@sveltejs/kit"
 import { mkdir, readFile, writeFile } from "fs/promises"
 import { join } from "path"
 import { FastResizeFilter, ResizeFilterType, Transformer } from "@napi-rs/image"
+import { createHash } from "crypto"
 
 const TILE_SIZE = 256
 const imgSize = TILE_SIZE * TILE_SIZE * 4
 const steps = [0, 1, 2, 4, 8, 16, 32]
 const empty = await readFile(join(".", "static", "empty.webp"))
+const emptyBlue = await readFile(join(".", "static", "empty-blue.webp"))
+const emptyWhite = await readFile(join(".", "static", "empty-white.webp"))
+const emptyHash = hashBuffer(empty)
+const emptyBlueHash = hashBuffer(emptyBlue)
+const emptyWhiteHash = hashBuffer(emptyWhite)
 
-async function upscaled(x: number, y: number, zoom: number, map: string, plane: string) {
-	const path = join(process.cwd(), "cache", map, zoom.toString(), plane)
+function hashBuffer(buf: Buffer) {
+	return createHash("md5").update(buf).digest("hex")
+}
+
+async function upscale(map: string, x: number, y: number, zoom: number, plane: number) {
+	const planeStr = plane.toString()
+	const path = join(".", "cache", map, zoom.toString(), planeStr)
 	const file = x + "-" + y
 
 	const fileBuffer = await readFile(join(path, file + ".webp")).catch(() => null)
 	if (fileBuffer) return fileBuffer
 
-	const saticPath = join(".", "static", "wasp-map-layers", map, plane)
+	const saticPath = join(".", "cache", "wasp-map-layers", map, planeStr)
 	const pngPath = join(saticPath, file + ".png")
 
-	const promises = await Promise.all([
+	const [png] = await Promise.all([
 		readFile(pngPath).catch(() => null),
 		mkdir(path, { recursive: true }).catch(() => undefined)
 	])
-	const png = promises[0]
-	if (!png) return Buffer.from(empty)
+	if (!png) return empty
+
+	const hash = createHash("md5").update(png).digest("hex")
+	if (hash === emptyHash) return empty
+	if (map === "map" && hash === emptyBlueHash) return emptyBlue
+	if (map === "collision" && hash === emptyWhiteHash) return emptyWhite
+
 	let transformer = new Transformer(png)
 
 	if (zoom > 0) {
@@ -35,13 +51,13 @@ async function upscaled(x: number, y: number, zoom: number, map: string, plane: 
 		console.error(e)
 		return null
 	})
-	if (!webp) return Buffer.from(empty)
+	if (!webp) return empty
 	await writeFile(join(path, file + ".webp"), webp).catch((e) => console.error(e))
 	return webp
 }
 
-async function downscale(x: number, y: number, zoom: number, step: number, map: string, plane: string) {
-	const path = join(process.cwd(), "cache", map, zoom.toString(), plane)
+async function downscale(map: string, x: number, y: number, zoom: number, plane: number, step: number) {
+	const path = join(".", "cache", map, zoom.toString(), plane.toString())
 	const file = x + "-" + y
 	const filePath = join(path, file + ".webp")
 
@@ -50,26 +66,34 @@ async function downscale(x: number, y: number, zoom: number, step: number, map: 
 
 	await mkdir(path, { recursive: true }).catch(() => undefined)
 
-	if (zoom == 0) {
-		return await upscaled(x, y, zoom, map, plane)
+	if (zoom === 0) {
+		return await upscale(map, x, y, zoom, plane)
 	}
 
 	const files = [
-		{ x: x, y: y },
-		{ x: x, y: y - step },
-		{ x: x + step, y: y },
+		{ x, y },
+		{ x, y: y - step },
+		{ x: x + step, y },
 		{ x: x + step, y: y - step }
 	]
 
-	const bufferPromises = []
 	const nextZoom = zoom + 1
-	const nextStep = steps[-nextZoom] // Adjusted: Use nextZoom to get the correct step for the child tiles
+	const nextStep = steps[-nextZoom]
 
-	for (let i = 0; i < files.length; i++) {
-		bufferPromises.push(downscale(files[i].x, files[i].y, nextZoom, nextStep, map, plane))
+	// Recursively get the four child tiles
+	const buffers = await Promise.all(files.map((f) => downscale(map, f.x, f.y, nextZoom, plane, nextStep)))
+
+	const allEmpty = buffers.every((b) => createHash("md5").update(b).digest("hex") === emptyHash)
+	if (allEmpty) return empty
+
+	if (map === "map") {
+		const allBlue = buffers.every((b) => createHash("md5").update(b).digest("hex") === emptyBlueHash)
+		if (allBlue) return emptyBlue
+	} else if (map === "collision") {
+		const allWhite = buffers.every((b) => createHash("md5").update(b).digest("hex") === emptyWhiteHash)
+		if (allWhite) return emptyWhite
 	}
 
-	const buffers = await Promise.all(bufferPromises)
 	const transformer = Transformer.fromRgbaPixels(new Uint8ClampedArray(imgSize), TILE_SIZE, TILE_SIZE)
 
 	const coordinates = [
@@ -79,19 +103,24 @@ async function downscale(x: number, y: number, zoom: number, step: number, map: 
 		{ x: 128, y: 128 }
 	]
 
+	// Resize all buffers
 	const resizedBuffers = await Promise.all(
-		buffers.map(
-			async (buffer) =>
-				await new Transformer(buffer!)
+		buffers.map(async (buffer) => {
+			try {
+				return await new Transformer(buffer)
 					.fastResize({
 						width: 128,
 						height: 128,
 						filter: FastResizeFilter.Box
 					})
 					.bmp()
-		)
+			} catch {
+				return empty
+			}
+		})
 	)
 
+	// Overlay the four tiles
 	for (let i = 0; i < resizedBuffers.length; i++) {
 		transformer.overlay(resizedBuffers[i], coordinates[i].x, coordinates[i].y)
 	}
@@ -100,8 +129,7 @@ async function downscale(x: number, y: number, zoom: number, step: number, map: 
 		console.error(e)
 		return null
 	})
-
-	if (!webp) return Buffer.from(empty)
+	if (!webp) return empty
 
 	await writeFile(filePath, webp).catch((e) => console.error(e))
 
@@ -133,7 +161,7 @@ export const GET = async ({ params: { map, zoom, plane, x, y } }) => {
 	let webp: Buffer<ArrayBufferLike>
 
 	if (zoomN >= 0) {
-		webp = await upscaled(xN, yN, zoomN, map, plane)
+		webp = await upscale(map, xN, yN, zoomN, planeN)
 	} else {
 		const step = steps[-zoomN]
 		const nearest = 2 ** -zoomN
@@ -142,7 +170,7 @@ export const GET = async ({ params: { map, zoom, plane, x, y } }) => {
 		if (xN != startX || yN != startY)
 			error(404, `The zoomed out file you are requesting is not valid. Request ${startX}-${startY} instead.`)
 
-		webp = await downscale(xN, yN, zoomN, step, map, plane)
+		webp = await downscale(map, xN, yN, zoomN, planeN, step)
 	}
 
 	return new Response(webp, {
