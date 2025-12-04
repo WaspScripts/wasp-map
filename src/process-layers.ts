@@ -61,7 +61,6 @@ async function upscale(map: string, x: number, y: number, zoom: number, plane: n
 		readFile(pngPath).catch(() => null),
 		mkdir(path, { recursive: true }).catch(() => undefined)
 	])
-	const png = promises[0]
 	if (!png) return Buffer.from(empty)
 	let transformer = new Transformer(png)
 
