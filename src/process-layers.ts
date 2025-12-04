@@ -8,6 +8,7 @@ const TILE_SIZE = 256
 const imgSize = TILE_SIZE * TILE_SIZE * 4
 const steps = [0, 1, 2, 4, 8, 16, 32]
 const empty = await readFile(join(".", "static", "empty.webp"))
+const emptyWhite = await readFile(join(".", "static", "empty-white.webp"))
 const minZoom = -6
 const maxZoom = 2
 const minPlane = 0
@@ -56,7 +57,7 @@ async function upscale(map: string, x: number, y: number, zoom: number, plane: n
 	const saticPath = join(".", "static", "wasp-map-layers", map, planeStr)
 	const pngPath = join(saticPath, file + ".png")
 
-	const promises = await Promise.all([
+	const [png] = await Promise.all([
 		readFile(pngPath).catch(() => null),
 		mkdir(path, { recursive: true }).catch(() => undefined)
 	])
@@ -93,15 +94,15 @@ async function downscale(map: string, x: number, y: number, zoom: number, plane:
 	}
 
 	const files = [
-		{ x: x, y: y },
-		{ x: x, y: y - step },
-		{ x: x + step, y: y },
+		{ x, y },
+		{ x, y: y - step },
+		{ x: x + step, y },
 		{ x: x + step, y: y - step }
 	]
 
 	const bufferPromises: Promise<Buffer<ArrayBufferLike>>[] = []
 	const nextZoom = zoom + 1
-	const nextStep = steps[-nextZoom] // Adjusted: Use nextZoom to get the correct step for the child tiles
+	const nextStep = steps[-nextZoom]
 
 	for (let i = 0; i < files.length; i++) {
 		bufferPromises.push(downscale(map, files[i].x, files[i].y, nextZoom, plane, nextStep))

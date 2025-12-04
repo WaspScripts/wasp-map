@@ -8,7 +8,10 @@
 
 	onMount(() => {
 		const cookie = getCookie("darkMode")
-		if (cookie != "") dark = cookie === "true"
+		if (cookie != "") {
+			dark = cookie === "true"
+			document.documentElement.classList.toggle("dark", dark)
+		}
 	})
 </script>
 

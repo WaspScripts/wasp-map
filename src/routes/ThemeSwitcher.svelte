@@ -19,7 +19,10 @@
 	let open = $state(false)
 	onMount(() => {
 		const cookie = getCookie("theme")
-		if (cookie != "") theme = cookie
+		if (cookie != "") {
+			theme = cookie
+			document.body.setAttribute("data-theme", theme)
+		}
 	})
 </script>
 
