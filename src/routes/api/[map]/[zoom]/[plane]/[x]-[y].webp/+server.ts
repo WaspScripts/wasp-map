@@ -26,7 +26,7 @@ async function upscale(map: string, x: number, y: number, zoom: number, plane: n
 	const fileBuffer = await readFile(join(path, file + ".webp")).catch(() => null)
 	if (fileBuffer) return fileBuffer
 
-	const saticPath = join(".", "cache", "wasp-map-layers", map, planeStr)
+	const saticPath = join(".", "static", "wasp-map-layers", map, planeStr)
 	const pngPath = join(saticPath, file + ".png")
 
 	const [png] = await Promise.all([

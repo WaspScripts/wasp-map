@@ -52,11 +52,11 @@
 	let positionX = 0
 	let positionY = 0
 
-	let x = 47
-	let y = 55
+	let x = $state(47)
+	let y = $state(55)
 
-	let width = 0
-	let height = 0
+	let width = $state(0)
+	let height = $state(0)
 
 	const size = $derived(zoom == trueZoom ? MAP_TILE_SIZE : MAP_TILE_SIZE * multiplier)
 
@@ -76,9 +76,6 @@
 	const y1 = $derived(Math.max(y - bufferY, minY))
 	const x2 = $derived(Math.min(x + bufferX, maxX))
 	const y2 = $derived(Math.min(step === 1 ? y + bufferY : Math.floor((y + bufferY) / step) * step, maxY))
-
-	$inspect("Center: ", x, ", ", y)
-	$inspect("[", x1, ",", y1, ",", x2, ",", y2, "]")
 
 	const tileCache = new Map<string, ImageBitmap | null>()
 	const tilePromises = new Map<string, Promise<ImageBitmap | null>>()
@@ -144,7 +141,7 @@
 		context.imageSmoothingEnabled = false
 
 		for (let x = x1; x <= x2; x += step) {
-			console.log(x)
+			//console.log(x)
 			for (let y = y2; y >= y1; y -= step) {
 				const key = getKey(x, y)
 				const cached = tileCache.get(key)
