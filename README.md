@@ -1,6 +1,7 @@
 # WaspScripts Online Map Tool
 
 A game world map tool inspired on [mejrs' map](https://github.com/mejrs/mejrs.github.io) and [rs-map-viewer](https://github.com/dennisdev/rs-map-viewer).
+The layout is also inspired in [Orka's version of the map](https://github.com/orkabyte/wasp-map).
 
 ## How the map is drawn
 
