@@ -1,0 +1,533 @@
+.leaflet-control-display {
+	position: relative;
+}
+
+.leaflet-control-display-collapsed {
+	width: 38px;
+	height: 38px;
+	display: grid;
+	place-items: center;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: background-color 0.15s;
+}
+
+.leaflet-control-display-collapsed-active {
+	background: #3a3a5e;
+}
+
+.leaflet-control-display-panel {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	margin-top: 6px;
+	z-index: 1000;
+	background: #1e1e2e;
+	border-radius: 8px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+	border: 1px solid #3a3a4e;
+}
+
+.leaflet-control-display-title {
+	padding: 8px 16px 0;
+	color: #9999aa;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.leaflet-control-display-form {
+	padding: 12px 16px;
+	display: grid;
+	grid-template-columns: auto 1fr;
+	grid-gap: 8px;
+	min-width: 220px;
+	align-items: center;
+}
+
+.leaflet-control-display-label {
+	text-align: right;
+	grid-column: 1 / 2;
+	color: #9999aa;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.leaflet-control-display-input,
+.leaflet-control-display-input-number {
+	grid-column: 2 / 3;
+}
+
+.leaflet-control-display-submit {
+	grid-column: 1 / -1;
+}
+
+.leaflet-control-display-input,
+.leaflet-control-display-input-number {
+	background: #2a2a3c;
+	border: 1px solid #3a3a4e;
+	color: #e0e0e8;
+	border-radius: 6px;
+	padding: 6px 10px;
+	font-size: 13px;
+	outline: none;
+	transition:
+		background-color 0.15s,
+		border-color 0.15s;
+	min-width: 160px;
+}
+
+.leaflet-control-display-input:focus,
+.leaflet-control-display-input-number:focus {
+	background: #333348;
+	border-color: #4a4a6a;
+}
+
+.leaflet-control-display-input-number {
+	width: 90px;
+}
+
+.leaflet-control-display-submit {
+	background: #3a3a5e;
+	border: 1px solid #3a3a4e;
+	color: #e0e0e8;
+	border-radius: 6px;
+	padding: 6px 10px;
+	cursor: pointer;
+	font-weight: 500;
+	font-size: 13px;
+	transition: background-color 0.15s;
+}
+
+.leaflet-control-display-submit:hover {
+	background: #4a4a6a;
+}
+
+.leaflet-control-map-input {
+	width: auto;
+	min-width: 200px;
+	background: #2a2a3c;
+	border: 1px solid #3a3a4e;
+	color: #e0e0e8;
+	border-radius: 6px;
+	padding: 6px 10px;
+	font-size: 13px;
+	outline: none;
+	transition:
+		background-color 0.15s,
+		border-color 0.15s;
+}
+
+.leaflet-control-map-input:focus {
+	background: #333348;
+	border-color: #4a4a6a;
+}
+
+.leaflet-control-display-container-expanded {
+	display: block;
+}
+
+textarea {
+	word-break: break-all;
+	background: #2a2a3c;
+	border: 1px solid #3a3a4e;
+	color: #e0e0e8;
+	border-radius: 6px;
+	padding: 6px 10px;
+}
+
+.leaflet-control-display-autocomplete-wrapper {
+	position: relative;
+	grid-column: 2 / 3;
+}
+
+.leaflet-control-display-autocomplete-wrapper > input {
+	width: 100%;
+	box-sizing: border-box;
+}
+
+.leaflet-control-display-autocomplete-dropdown {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	max-height: 200px;
+	overflow-y: auto;
+	background: #1e1e2e;
+	border: 1px solid #3a3a4e;
+	border-top: none;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+	z-index: 1000;
+	display: none;
+	border-radius: 0 0 6px 6px;
+}
+
+.leaflet-control-display-autocomplete-dropdown.visible {
+	display: block;
+}
+
+.leaflet-control-display-autocomplete-item {
+	padding: 4px 8px;
+	cursor: pointer;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	font-size: 12px;
+	color: #e0e0e8;
+	transition: background-color 0.15s;
+}
+
+.leaflet-control-display-autocomplete-item:hover,
+.leaflet-control-display-autocomplete-item.active {
+	background-color: #3a3a5e;
+}
+
+.leaflet-control-display-label-icon {
+	color: #ffffff;
+	font-size: 13px;
+	font-weight: 600;
+	user-select: none;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.leaflet-control-display-label-icon svg {
+	width: 18px;
+	height: 18px;
+}
+
+.leaflet-control-display-form-search {
+	width: 290px;
+}
+
+.leaflet-control-display-form-search .leaflet-control-display-label {
+	min-width: 85px;
+}
+
+.leaflet-control-display-form-rect {
+	grid-template-columns: auto 1fr auto 1fr;
+}
+
+/* Shared label-column width so input left edges align across box and poly modes */
+.leaflet-control-display-form-rect .leaflet-control-display-label,
+.leaflet-control-display-form-poly .leaflet-control-display-label {
+	min-width: var(--rect-label-width);
+}
+
+.leaflet-control-display-form-rect .leaflet-control-display-label,
+.leaflet-control-display-form-rect .leaflet-control-display-input-number {
+	grid-column: auto;
+}
+
+.leaflet-control-display-form-rect .leaflet-control-display-input-number {
+	min-width: 85px;
+}
+
+.leaflet-control-map-row {
+	grid-column: 1 / -1;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.leaflet-control-map-row .leaflet-control-display-label {
+	grid-column: unset;
+	flex-shrink: 0;
+}
+
+.leaflet-control-map-row .leaflet-control-map-input {
+	flex: 1;
+	min-width: 0;
+}
+
+.leaflet-control-map-row .leaflet-control-display-input-copy-wrapper {
+	flex: 1;
+	min-width: 0;
+}
+
+.leaflet-control-display-form-rect .leaflet-control-display-input-number::-webkit-inner-spin-button,
+.leaflet-control-display-form-rect
+	.leaflet-control-display-input-number::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+.leaflet-control-display-form-rect .leaflet-control-display-input-number {
+	-moz-appearance: textfield;
+}
+
+.leaflet-control-display-form-rect .leaflet-control-display-coords-row {
+	grid-column: 1 / -1;
+}
+
+/* Separate the coordinate-entry rows from the Vertices/Coords output, matching
+   the gap the polygon mode has between its vertex list and the Vertices field.
+   Targets only the Vertices row (the map-row right after a numeric input). */
+.leaflet-control-display-form-rect
+	.leaflet-control-display-input-copy-wrapper
+	+ .leaflet-control-map-row {
+	margin-top: 15px;
+}
+
+.leaflet-control-display-input-copy-wrapper {
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+
+.leaflet-control-display-input-copy-btn {
+	position: absolute;
+	right: 4px;
+	top: 50%;
+	transform: translateY(-50%);
+	background: none;
+	border: none;
+	color: #9999aa;
+	cursor: pointer;
+	padding: 2px;
+	display: none;
+	line-height: 0;
+}
+
+.leaflet-control-display-input-copy-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+.leaflet-control-display-input-copy-wrapper:hover .leaflet-control-display-input-copy-btn {
+	display: block;
+}
+
+.leaflet-control-display-input-copy-btn:hover {
+	color: #e0e0e8;
+}
+
+.leaflet-draggable-rect {
+	cursor: move;
+}
+
+.leaflet-vertex-handle {
+	box-sizing: border-box;
+	background: #00d4ff;
+	border: 3px solid #00d4ff;
+	border-radius: 50%;
+	transition:
+		background-color 0.15s,
+		border-color 0.15s;
+}
+
+.leaflet-vertex-handle:hover {
+	background: #33e0ff;
+	border-color: #33e0ff;
+}
+
+.leaflet-edge-handle {
+	cursor: ns-resize;
+}
+
+.leaflet-draggable-poly {
+	cursor: move;
+}
+
+.leaflet-control-display-section-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 12px 16px 0;
+}
+
+.leaflet-control-display-section-title-inline {
+	color: #9999aa;
+	font-size: 11px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.leaflet-control-display-mode-toggle-inline {
+	display: flex;
+	gap: 4px;
+}
+
+.leaflet-control-display-mode-btn {
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	display: grid;
+	place-items: center;
+	background: #2a2a3c;
+	border: 1px solid #3a3a4e;
+	border-radius: 6px;
+	color: #9999aa;
+	cursor: pointer;
+	transition:
+		background-color 0.15s,
+		border-color 0.15s,
+		color 0.15s;
+}
+
+.leaflet-control-display-mode-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
+.leaflet-control-display-mode-btn:hover {
+	background: #333348;
+	border-color: #4a4a6a;
+	color: #e0e0e8;
+}
+
+.leaflet-control-display-mode-btn-active {
+	background: #3a3a5e;
+	border-color: #00d4ff;
+	color: #00d4ff;
+}
+
+.leaflet-control-display-mode-btn-active:hover {
+	background: #4a4a6a;
+	border-color: #00d4ff;
+	color: #00d4ff;
+}
+
+.leaflet-control-display-form-poly {
+	padding: 12px 16px;
+}
+
+.leaflet-control-display-poly-vertices {
+	height: 190px;
+	overflow-y: auto;
+	scrollbar-gutter: stable;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	margin-bottom: 10px;
+}
+
+.leaflet-control-display-form-poly .leaflet-control-map-row {
+	margin-bottom: 10px;
+}
+
+.leaflet-control-display-poly-vertex-row {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+.leaflet-control-display-poly-vertex-row .leaflet-control-display-label {
+	text-align: right;
+	flex-shrink: 0;
+}
+
+.leaflet-control-display-poly-vertex-row .leaflet-control-display-label:first-child {
+	min-width: var(--rect-label-width);
+}
+
+.leaflet-control-display-poly-vertex-row .leaflet-control-display-input-number {
+	flex: 1;
+	min-width: 0;
+}
+
+.leaflet-control-display-poly-vertex-row
+	.leaflet-control-display-input-number::-webkit-inner-spin-button,
+.leaflet-control-display-poly-vertex-row
+	.leaflet-control-display-input-number::-webkit-outer-spin-button {
+	-webkit-appearance: none;
+	margin: 0;
+}
+.leaflet-control-display-poly-vertex-row .leaflet-control-display-input-number {
+	-moz-appearance: textfield;
+}
+
+.leaflet-control-display-coords-row {
+	display: flex;
+	gap: 8px;
+	align-items: flex-start;
+	margin-bottom: 10px;
+}
+
+.leaflet-control-display-coords-row .leaflet-control-display-label {
+	grid-column: unset;
+	flex-shrink: 0;
+	padding-top: 6px;
+}
+
+.leaflet-control-display-coords-row textarea {
+	flex: 1;
+	min-width: 0;
+	font-family: monospace;
+	font-size: 11px;
+	resize: vertical;
+	cursor: pointer;
+	scrollbar-gutter: stable;
+}
+
+.leaflet-control-display-coords-row textarea:hover {
+	border-color: #4a4a6a;
+}
+
+/* Slim, themed scrollbars that sit in a reserved gutter (never overlap fields) */
+.leaflet-control-display-poly-vertices,
+.leaflet-control-display-coords-row textarea {
+	scrollbar-width: thin;
+	scrollbar-color: #3a3a4e transparent;
+}
+
+.leaflet-control-display-poly-vertices::-webkit-scrollbar,
+.leaflet-control-display-coords-row textarea::-webkit-scrollbar {
+	width: 8px;
+}
+
+.leaflet-control-display-poly-vertices::-webkit-scrollbar-track,
+.leaflet-control-display-coords-row textarea::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+.leaflet-control-display-poly-vertices::-webkit-scrollbar-thumb,
+.leaflet-control-display-coords-row textarea::-webkit-scrollbar-thumb {
+	background: #3a3a4e;
+	border-radius: 4px;
+}
+
+.leaflet-control-display-poly-vertices::-webkit-scrollbar-thumb:hover,
+.leaflet-control-display-coords-row textarea::-webkit-scrollbar-thumb:hover {
+	background: #4a4a6a;
+}
+
+.leaflet-control-display-new-btn {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	width: 100%;
+}
+
+.leaflet-control-display-new-btn svg {
+	width: 14px;
+	height: 14px;
+}
+
+.leaflet-control-display-chunk-section {
+	padding: 8px 16px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.leaflet-control-display-expanded-rect {
+	--rect-label-width: 56px;
+	min-width: 380px;
+}
+
+.leaflet-control-display-card-hidden {
+	display: none;
+}
+
+.leaflet-control-credits {
+	background: #1e1e2e;
+	border: 1px solid #3a3a4e;
+	color: #cdd6f4;
+	padding: 4px 8px;
+	font-size: 11px;
+	border-radius: 4px;
+}
